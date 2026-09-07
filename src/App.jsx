@@ -1,8 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ArrowDown,
   ArrowRight,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   MapPin,
   Menu,
   MessageCircle,
@@ -42,11 +44,12 @@ const services = [
 ];
 
 const projects = [
-  { src: image("work-08.jpg"), label: "Harley-Davidson", note: "Поставили музыку и свет", shape: "tall" },
-  { src: image("work-11.jpg"), label: "Volkswagen", note: "Заменили мультимедиа", shape: "wide" },
-  { src: image("work-05.jpg"), label: "Железо в наличии", note: "Pride · Dynamic State", shape: "small" },
-  { src: image("work-09.jpg"), label: "Внутри Harley", note: "Проводка и шумоизоляция", shape: "small" },
-  { src: image("work-12.jpg"), label: "Hyundai", note: "Добавили света", shape: "wide" },
+  { src: image("work-08.jpg"), label: "Harley-Davidson", note: "Поставили музыку и свет" },
+  { src: image("work-11.jpg"), label: "Volkswagen", note: "Заменили мультимедиа" },
+  { src: image("work-05.jpg"), label: "Железо в наличии", note: "Pride · Dynamic State" },
+  { src: image("work-09.jpg"), label: "Внутри Harley", note: "Проводка и шумоизоляция" },
+  { src: image("work-12.jpg"), label: "Hyundai", note: "Добавили света" },
+  { src: image("work-10.jpg"), label: "VW Polo", note: "Комплект перед установкой" },
 ];
 
 const faqs = [
@@ -74,6 +77,105 @@ function Brand({ compact = false }) {
   );
 }
 
+function SpeakerDot({ active, onClick, label }) {
+  return (
+    <button
+      type="button"
+      className={`speaker-dot ${active ? "is-active" : ""}`}
+      onClick={onClick}
+      aria-label={label}
+      aria-current={active ? "true" : undefined}
+    >
+      <span className="speaker-ring" />
+      <span className="speaker-ring" />
+      <span className="speaker-cone" />
+    </button>
+  );
+}
+
+function ProjectSlider({ items, onOpen }) {
+  const [index, setIndex] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const touchX = useRef(null);
+
+  useEffect(() => {
+    if (paused || items.length < 2) return undefined;
+    const timer = setInterval(() => {
+      setIndex((current) => (current + 1) % items.length);
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [paused, items.length]);
+
+  const go = (next) => {
+    setIndex((next + items.length) % items.length);
+  };
+
+  const onTouchStart = (event) => {
+    touchX.current = event.touches[0].clientX;
+    setPaused(true);
+  };
+
+  const onTouchEnd = (event) => {
+    if (touchX.current === null) return;
+    const delta = event.changedTouches[0].clientX - touchX.current;
+    touchX.current = null;
+    if (Math.abs(delta) > 40) go(index + (delta < 0 ? 1 : -1));
+    setPaused(false);
+  };
+
+  const current = items[index];
+
+  return (
+    <div
+      className="project-slider"
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+      onTouchStart={onTouchStart}
+      onTouchEnd={onTouchEnd}
+    >
+      <div className="slider-stage">
+        <button
+          type="button"
+          className="slider-slide"
+          onClick={() => onOpen(index)}
+          aria-label={`Открыть фото: ${current.label}`}
+        >
+          <img src={current.src} alt={`${current.label} — ${current.note}`} />
+          <span className="slider-caption">
+            <b>{current.label}</b>
+            <small>{current.note}</small>
+            <em>нажмите, чтобы открыть</em>
+          </span>
+        </button>
+
+        <button type="button" className="slider-nav prev" onClick={() => go(index - 1)} aria-label="Предыдущее фото">
+          <ChevronLeft />
+        </button>
+        <button type="button" className="slider-nav next" onClick={() => go(index + 1)} aria-label="Следующее фото">
+          <ChevronRight />
+        </button>
+      </div>
+
+      <div className="slider-controls">
+        <div className="speaker-track" role="tablist" aria-label="Слайды работ">
+          {items.map((item, i) => (
+            <SpeakerDot
+              key={item.src}
+              active={i === index}
+              onClick={() => go(i)}
+              label={`Фото ${i + 1}: ${item.label}`}
+            />
+          ))}
+        </div>
+        <p className="slider-hint">
+          <span className={`progress-pulse ${paused ? "is-paused" : ""}`} />
+          {paused ? "Пауза" : "Листается само"} · {index + 1} / {items.length}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeService, setActiveService] = useState(0);
@@ -96,6 +198,17 @@ export default function App() {
     document.body.classList.toggle("no-scroll", menuOpen || lightbox !== null);
     return () => document.body.classList.remove("no-scroll");
   }, [menuOpen, lightbox]);
+
+  useEffect(() => {
+    if (lightbox === null) return undefined;
+    const onKey = (event) => {
+      if (event.key === "Escape") setLightbox(null);
+      if (event.key === "ArrowRight") setLightbox((i) => (i + 1) % projects.length);
+      if (event.key === "ArrowLeft") setLightbox((i) => (i - 1 + projects.length) % projects.length);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [lightbox]);
 
   const submitForm = async (event) => {
     event.preventDefault();
@@ -157,7 +270,7 @@ export default function App() {
             </h1>
             <div className="hero-bottom">
               <p>Сначала разберёмся, что вам нужно. Потом подберём железо, поставим и настроим. Без покупок наугад.</p>
-              <a className="round-link" href="#contact" aria-label="Обсудить проект"><ArrowDown /></a>
+              <a className="round-link" href="#contact" aria-label="Написать нам"><ArrowDown /></a>
             </div>
           </div>
           <div className="hero-visual">
@@ -189,10 +302,13 @@ export default function App() {
               <article
                 key={service.id}
                 className={activeService === index ? "is-active" : ""}
-                onMouseEnter={() => setActiveService(index)}
-                onClick={() => setActiveService(index)}
               >
-                <button aria-expanded={activeService === index}>
+                <button
+                  type="button"
+                  aria-expanded={activeService === index}
+                  onMouseEnter={() => setActiveService(index)}
+                  onClick={() => setActiveService(index)}
+                >
                   <span>{service.id}</span>
                   <h3>{service.title}</h3>
                   <Plus />
@@ -212,19 +328,8 @@ export default function App() {
             <h2>Вот чем были<br /><i>заняты.</i></h2>
             <p>Снимаем сами, обычно прямо в мастерской. Поэтому здесь всё настоящее — и машины, и рабочий беспорядок.</p>
           </div>
-          <div className="project-grid">
-            {projects.map((project, index) => (
-              <button
-                className={`project ${project.shape}`}
-                key={project.src}
-                onClick={() => setLightbox(index)}
-                data-reveal
-              >
-                <img src={project.src} alt={`${project.label} — ${project.note}`} loading="lazy" />
-                <span><b>{project.label}</b><small>{project.note}</small></span>
-                <i><Plus /></i>
-              </button>
-            ))}
+          <div className="projects-body">
+            <ProjectSlider items={projects} onOpen={setLightbox} />
           </div>
           <a className="vk-link" href="https://vk.ru/savaaudio" target="_blank" rel="noreferrer">
             Остальные работы — во ВКонтакте <ArrowRight />
@@ -308,8 +413,28 @@ export default function App() {
 
       {lightbox !== null && (
         <div className="lightbox" role="dialog" aria-modal="true" onClick={() => setLightbox(null)}>
-          <button onClick={() => setLightbox(null)} aria-label="Закрыть"><X /></button>
-          <img src={projects[lightbox].src} alt={projects[lightbox].label} onClick={(e) => e.stopPropagation()} />
+          <button type="button" className="lightbox-close" onClick={() => setLightbox(null)} aria-label="Закрыть"><X /></button>
+          <button
+            type="button"
+            className="lightbox-nav prev"
+            onClick={(e) => { e.stopPropagation(); setLightbox((i) => (i - 1 + projects.length) % projects.length); }}
+            aria-label="Предыдущее"
+          >
+            <ChevronLeft />
+          </button>
+          <img
+            src={projects[lightbox].src}
+            alt={projects[lightbox].label}
+            onClick={(e) => e.stopPropagation()}
+          />
+          <button
+            type="button"
+            className="lightbox-nav next"
+            onClick={(e) => { e.stopPropagation(); setLightbox((i) => (i + 1) % projects.length); }}
+            aria-label="Следующее"
+          >
+            <ChevronRight />
+          </button>
           <p>{projects[lightbox].label} <span>{projects[lightbox].note}</span></p>
         </div>
       )}
