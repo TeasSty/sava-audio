@@ -93,10 +93,11 @@ function SpeakerDot({ active, onClick, label }) {
   );
 }
 
-function ProjectSlider({ items, onOpen }) {
+function ProjectSlider({ items, onOpen, paused: pausedExternal = false }) {
   const [index, setIndex] = useState(0);
-  const [paused, setPaused] = useState(false);
+  const [pausedHover, setPausedHover] = useState(false);
   const touchX = useRef(null);
+  const paused = pausedExternal || pausedHover;
 
   useEffect(() => {
     if (paused || items.length < 2) return undefined;
@@ -112,7 +113,7 @@ function ProjectSlider({ items, onOpen }) {
 
   const onTouchStart = (event) => {
     touchX.current = event.touches[0].clientX;
-    setPaused(true);
+    setPausedHover(true);
   };
 
   const onTouchEnd = (event) => {
@@ -120,7 +121,7 @@ function ProjectSlider({ items, onOpen }) {
     const delta = event.changedTouches[0].clientX - touchX.current;
     touchX.current = null;
     if (Math.abs(delta) > 40) go(index + (delta < 0 ? 1 : -1));
-    setPaused(false);
+    setTimeout(() => setPausedHover(false), 2500);
   };
 
   const current = items[index];
@@ -128,25 +129,31 @@ function ProjectSlider({ items, onOpen }) {
   return (
     <div
       className="project-slider"
-      onMouseEnter={() => setPaused(true)}
-      onMouseLeave={() => setPaused(false)}
+      onMouseEnter={() => setPausedHover(true)}
+      onMouseLeave={() => setPausedHover(false)}
       onTouchStart={onTouchStart}
       onTouchEnd={onTouchEnd}
     >
       <div className="slider-stage">
-        <button
-          type="button"
-          className="slider-slide"
-          onClick={() => onOpen(index)}
-          aria-label={`Открыть фото: ${current.label}`}
-        >
-          <img src={current.src} alt={`${current.label} — ${current.note}`} />
-          <span className="slider-caption">
-            <b>{current.label}</b>
-            <small>{current.note}</small>
-            <em>нажмите, чтобы открыть</em>
-          </span>
-        </button>
+        {items.map((item, i) => (
+          <button
+            type="button"
+            key={item.src}
+            className={`slider-slide ${i === index ? "is-active" : ""}`}
+            onClick={() => onOpen(i)}
+            aria-hidden={i !== index}
+            tabIndex={i === index ? 0 : -1}
+            aria-label={`Открыть фото: ${item.label}`}
+          >
+            <img src={item.src} alt={`${item.label} — ${item.note}`} />
+          </button>
+        ))}
+
+        <span className="slider-caption">
+          <b>{current.label}</b>
+          <small>{current.note}</small>
+          <em>нажмите, чтобы открыть</em>
+        </span>
 
         <button type="button" className="slider-nav prev" onClick={() => go(index - 1)} aria-label="Предыдущее фото">
           <ChevronLeft />
@@ -154,6 +161,10 @@ function ProjectSlider({ items, onOpen }) {
         <button type="button" className="slider-nav next" onClick={() => go(index + 1)} aria-label="Следующее фото">
           <ChevronRight />
         </button>
+
+        <div className="slider-progress" aria-hidden="true">
+          <i className={paused ? "is-paused" : ""} key={`${index}-${paused}`} />
+        </div>
       </div>
 
       <div className="slider-controls">
@@ -168,8 +179,7 @@ function ProjectSlider({ items, onOpen }) {
           ))}
         </div>
         <p className="slider-hint">
-          <span className={`progress-pulse ${paused ? "is-paused" : ""}`} />
-          {paused ? "Пауза" : "Листается само"} · {index + 1} / {items.length}
+          {paused ? "Пауза" : "Каждые 5 сек"} · {index + 1} / {items.length}
         </p>
       </div>
     </div>
@@ -315,7 +325,7 @@ export default function App() {
                 </button>
                 <div className="service-detail">
                   <p>{service.text}</p>
-                  <div>{service.tags.map((tag) => <span key={tag}>{tag}</span>)}</div>
+                  <div className="service-tags">{service.tags.map((tag) => <span key={tag}>{tag}</span>)}</div>
                 </div>
               </article>
             ))}
@@ -323,13 +333,15 @@ export default function App() {
         </section>
 
         <section className="projects" id="projects">
-          <div className="projects-intro section-pad" data-reveal>
+          <div className="projects-intro" data-reveal>
             <span className="section-index">/ 03 — Недавние работы</span>
-            <h2>Вот чем были<br /><i>заняты.</i></h2>
-            <p>Снимаем сами, обычно прямо в мастерской. Поэтому здесь всё настоящее — и машины, и рабочий беспорядок.</p>
+            <div className="projects-intro-copy">
+              <h2>Вот чем были<br /><i>заняты.</i></h2>
+              <p>Снимаем сами, обычно прямо в мастерской. Поэтому здесь всё настоящее — и машины, и рабочий беспорядок.</p>
+            </div>
           </div>
           <div className="projects-body">
-            <ProjectSlider items={projects} onOpen={setLightbox} />
+            <ProjectSlider items={projects} onOpen={setLightbox} paused={lightbox !== null} />
           </div>
           <a className="vk-link" href="https://vk.ru/savaaudio" target="_blank" rel="noreferrer">
             Остальные работы — во ВКонтакте <ArrowRight />
